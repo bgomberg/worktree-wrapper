@@ -173,6 +173,10 @@ class WorktreeWrapper:
         worktree_path_rel = os.path.relpath(worktree_path, HOME_PATH).replace('\\', '\\\\')
         self._add_tmp_script_line('cd $HOME/%s' % (worktree_path_rel))
 
+    def pull_cmd(self, args):
+        repo = self._get_repo_from_args(args)
+        self._repo_command(self._config['repos'][repo], 'git pull master')
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(prog='ww')
@@ -226,6 +230,11 @@ if __name__ == '__main__':
     parser_cd.set_defaults(func='cd_cmd')
     parser_cd.add_argument('name', type=str, help='name of the worktree')
     parser_cd.add_argument('--repo', type=str, help='repo to use (overrides active repo)')
+
+    # "pull" subcommand
+    parser_pull = subparsers.add_parser('pull', help='pulls the master branch from the remote')
+    parser_pull.set_defaults(func='pull_cmd')
+    parser_pull.add_argument('--repo', type=str, help='repo to use (overrides active repo)')
 
     args = parser.parse_args()
     getattr(WorktreeWrapper(), args.func)(args)
