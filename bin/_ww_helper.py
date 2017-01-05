@@ -74,6 +74,14 @@ class WorktreeWrapper:
     def _repo_command_num_lines(self, repo_path, cmd):
         return int(self._repo_command(repo_path, cmd + ' | wc -l', print_output=False))
 
+    def _repo_command_success(self, repo_path, cmd):
+        cwd = os.getcwd()
+        os.chdir(repo_path)
+        with open(os.devnull, "w") as f:
+            exit_code = subprocess.call(cmd, stdout=f, stderr=f, shell=True)
+        os.chdir(cwd)
+        return exit_code == 0
+
     def _add_tmp_script_line(self, line):
         self._temp_file.write(line + '\n')
 
@@ -104,6 +112,8 @@ class WorktreeWrapper:
             self._abort('Repo does not exist')
         shutil.rmtree(self._config['repos'][args.name]['base'])
         del self._config['repos'][args.name]
+        if self._config['active_repo'] == args.name:
+            self._config['active_repo'] = None
 
     def repo_set_active_cmd(self, args):
         if args.name not in self._config['repos']:
@@ -114,16 +124,22 @@ class WorktreeWrapper:
         repo = self._get_repo_from_args(args)
         repo_info = self._config['repos'][repo]
         wt_path = os.path.join(repo_info['base'], args.name)
-        cmd = 'git worktree add "%s" -b "%s"' % (wt_path , args.name)
+        if self._repo_command_success(repo_info['repo'], 'git rev-parse --verify %s' % (args.name)):
+            # branch already exists
+            cmd = 'git worktree add "%s" "%s"' % (wt_path , args.name)
+        else:
+            # branch doesn't exist
+            cmd = 'git worktree add "%s" -b "%s"' % (wt_path , args.name)
         self._repo_command(repo_info['repo'], cmd)
+        # cd to the new directory
+        self.cd_cmd(args)
 
-    def rm_cmd(self, args):
-        repo = self._get_repo_from_args(args)
+    def _rm_worktree(self, repo, name, force=False, keep=False):
         repo_info = self._config['repos'][repo]
-        wt_path = os.path.join(repo_info['base'], args.name)
+        wt_path = os.path.join(repo_info['base'], name)
         if not os.path.exists(wt_path):
             self._abort('Worktree does not exist')
-        if not args.force:
+        if not force and not keep:
             # make sure the working tree is completely clean
             if self._repo_command_num_lines(wt_path, 'git status --porcelain') != 0:
                 self._abort('Working tree is not clean (override with "-f")')
@@ -133,15 +149,21 @@ class WorktreeWrapper:
                 self._abort('Internal error: No branches contain HEAD commit')
             elif num_branches == 1:
                 self._abort('Branch is not merged (override with "-f")')
+        # move to the user's home directory first
+        os.chdir(HOME_PATH)
         # remove the directory
         shutil.rmtree(wt_path)
         # remove the worktree from git's metadata
         self._repo_command(repo_info['repo'], 'git worktree prune')
-        # remove the branch
-        del_flag = '-D' if args.force else '-d'
-        self._repo_command(repo_info['repo'], 'git branch %s %s' % (del_flag, args.name))
-        if self._config['active_repo'] == repo:
-            self._config['active_repo'] = None
+        if not keep:
+            # remove the branch
+            del_flag = '-D' if force else '-d'
+            self._repo_command(repo_info['repo'], 'git branch %s %s' % (del_flag, name))
+
+    def rm_cmd(self, args):
+        repo = self._get_repo_from_args(args)
+        self._rm_worktree(repo, args.name, args.force, args.keep)
+        self._add_tmp_script_line('cd $HOME')
 
     def ls_cmd(self, args):
         repo = self._get_repo_from_args(args)
@@ -159,6 +181,8 @@ class WorktreeWrapper:
             commit = info['HEAD'][:7]
             branch = info['branch'].split('/')[-1]
             worktrees.append((worktree_name, worktree_path, commit, branch))
+        if not worktrees:
+            return
         name_width = max(len(x[0]) for x in worktrees)
         path_width = max(len(x[1]) for x in worktrees)
         for name, path, commit, branch in worktrees:
@@ -175,7 +199,13 @@ class WorktreeWrapper:
 
     def pull_cmd(self, args):
         repo = self._get_repo_from_args(args)
-        self._repo_command(self._config['repos'][repo], 'git pull master')
+        self._repo_command(self._config['repos'][repo]['repo'], 'git pull origin master')
+
+    def land_cmd(self, args):
+        repo = self._get_repo_from_args(args)
+        self._rm_worktree(repo, args.name, keep=True)
+        self._repo_command(self._config['repos'][repo]['repo'], "arc land %s" % (args.name))
+        self._add_tmp_script_line('cd $HOME')
 
 
 if __name__ == '__main__':
@@ -216,6 +246,8 @@ if __name__ == '__main__':
     parser_rm = subparsers.add_parser('rm', help='removes a worktree')
     parser_rm.set_defaults(func='rm_cmd')
     parser_rm.add_argument('name', type=str, help='name of the worktree')
+    parser_rm.add_argument('-k', '--keep', action='store_true',
+                            help='keeps the branch rather than deleting it')
     parser_rm.add_argument('-f', '--force', action='store_true',
                             help='overrides the checks and forces the removal')
     parser_rm.add_argument('--repo', type=str, help='repo to use (overrides active repo)')
@@ -235,6 +267,12 @@ if __name__ == '__main__':
     parser_pull = subparsers.add_parser('pull', help='pulls the master branch from the remote')
     parser_pull.set_defaults(func='pull_cmd')
     parser_pull.add_argument('--repo', type=str, help='repo to use (overrides active repo)')
+
+    # "land" subcommand
+    parser_land = subparsers.add_parser('land', help='removes the worktree and runs "arc land"')
+    parser_land.set_defaults(func='land_cmd')
+    parser_land.add_argument('name', type=str, help='name of the worktree')
+    parser_land.add_argument('--repo', type=str, help='repo to use (overrides active repo)')
 
     args = parser.parse_args()
     getattr(WorktreeWrapper(), args.func)(args)
