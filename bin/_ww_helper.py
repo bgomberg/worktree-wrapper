@@ -149,8 +149,8 @@ class WorktreeWrapper:
                 self._abort('Internal error: No branches contain HEAD commit')
             elif num_branches == 1:
                 self._abort('Branch is not merged (override with "-f")')
-        # move to the user's home directory first
-        os.chdir(HOME_PATH)
+        if os.path.realpath(os.getcwd()).startsWith(os.path.realpath(wt_path)):
+            self._abort('Cannot be run from within the working tree')
         # remove the directory
         shutil.rmtree(wt_path)
         # remove the worktree from git's metadata
@@ -163,7 +163,6 @@ class WorktreeWrapper:
     def rm_cmd(self, args):
         repo = self._get_repo_from_args(args)
         self._rm_worktree(repo, args.name, args.force, args.keep)
-        self._add_tmp_script_line('cd $HOME')
 
     def ls_cmd(self, args):
         repo = self._get_repo_from_args(args)
@@ -205,7 +204,6 @@ class WorktreeWrapper:
         repo = self._get_repo_from_args(args)
         self._rm_worktree(repo, args.name, keep=True)
         self._repo_command(self._config['repos'][repo]['repo'], "arc land %s" % (args.name))
-        self._add_tmp_script_line('cd $HOME')
 
 
 if __name__ == '__main__':
