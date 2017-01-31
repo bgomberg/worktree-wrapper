@@ -149,7 +149,7 @@ class WorktreeWrapper:
                 self._abort('Internal error: No branches contain HEAD commit')
             elif num_branches == 1:
                 self._abort('Branch is not merged (override with "-f")')
-        if os.path.realpath(os.getcwd()).startsWith(os.path.realpath(wt_path)):
+        if os.path.realpath(os.getcwd()).startswith(os.path.realpath(wt_path)):
             self._abort('Cannot be run from within the working tree')
         # remove the directory
         shutil.rmtree(wt_path)
