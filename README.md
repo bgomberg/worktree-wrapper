@@ -7,6 +7,7 @@ Worktree-wrapper installs as a single `ww` command via the following steps:
 1. Download / clone this repository
 2. Add the `bin` folder to your `PATH`
 3. Create an alias in your `.bashrc` (or equivalent) file: ```alias ww=". _ww.sh"```
+4. (Optional) Source bin/ww_completions.bash to get auto-complete functionality.
 
 ## Command Documentation
 The built-in help command `ww [...] -h` is the best and most up-to-date way to learn about the different `ww` commands and flags.
@@ -30,7 +31,7 @@ The prefered workflow is to create a new worktree with every new branch you crea
 You can now make changes to the contents of the worktree you created and use the branch within the worktree as you normally would (commit, push, etc).
 
 ### Merge Changes
-_This is still under development. Currently, you must merge the branch from the base repository manually first, then use the `ww rm ...` command to remove the worktree (and branch)._
+If using arcanist, you can perform an equivalent to `arc land` by running `ww land` from outside of the worktree. This will also remove the worktree in the process.
 
 ## License and Contributions
 The code contained within this repository is licensed under the GPLv3 license. See `LICENSE.md` for the complete text of the license. Pull requests and forks are welcome and encouraged if you find this program useful.
