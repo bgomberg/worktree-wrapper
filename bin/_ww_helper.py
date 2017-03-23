@@ -139,10 +139,11 @@ class WorktreeWrapper:
         wt_path = os.path.join(repo_info['base'], name)
         if not os.path.exists(wt_path):
             self._abort('Worktree does not exist')
-        if not force and not keep:
+        if not force:
             # make sure the working tree is completely clean
             if self._repo_command_num_lines(wt_path, 'git status --porcelain') != 0:
                 self._abort('Working tree is not clean (override with "-f")')
+        if not force and not keep:
             # make sure the branch is merged by checking how many branches contain the HEAD commit
             num_branches = self._repo_command_num_lines(wt_path, 'git branch -a --contains HEAD')
             if num_branches == 0:
