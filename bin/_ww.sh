@@ -3,12 +3,12 @@
 TEMPFILE="$HOME/.wwtmp"
 
 if [ -f $TEMPFILE ]; then
-    rm $TEMPFILE
+    rm -f $TEMPFILE
 fi
 
 _ww_helper.py "$@"
 
 if [ -f $TEMPFILE ]; then
     source $TEMPFILE
-    rm $TEMPFILE
+    rm -f $TEMPFILE
 fi
